@@ -91,21 +91,26 @@ function Dashboard() {
       <main className="mx-auto max-w-6xl px-6 py-6 space-y-6">
         <StatusCard status={status} onRefresh={refreshStatus} />
 
-        <Tabs defaultValue="ask">
+        <Tabs defaultValue="cognitive">
           <TabsList>
+            <TabsTrigger value="cognitive">Cognitive</TabsTrigger>
             <TabsTrigger value="ask">Ask</TabsTrigger>
             <TabsTrigger value="ingest">Ingest</TabsTrigger>
             <TabsTrigger value="goal">Goal</TabsTrigger>
             <TabsTrigger value="skills">Skills</TabsTrigger>
             <TabsTrigger value="ku">Knowledge</TabsTrigger>
+            <TabsTrigger value="learning">Learning</TabsTrigger>
           </TabsList>
 
+          <TabsContent value="cognitive"><CognitivePanel base={base} /></TabsContent>
           <TabsContent value="ask"><AskPanel base={base} /></TabsContent>
           <TabsContent value="ingest"><IngestPanel base={base} onDone={refreshStatus} /></TabsContent>
           <TabsContent value="goal"><GoalPanel base={base} /></TabsContent>
           <TabsContent value="skills"><SkillsPanel base={base} /></TabsContent>
           <TabsContent value="ku"><KuPanel base={base} /></TabsContent>
+          <TabsContent value="learning"><LearningPanel base={base} /></TabsContent>
         </Tabs>
+
       </main>
     </div>
   );
