@@ -379,3 +379,164 @@ function KuPanel({ base }: { base: string }) {
     </Card>
   );
 }
+
+function CognitivePanel({ base }: { base: string }) {
+  const [text, setText] = useState("");
+  const [project, setProject] = useState("");
+  const [dryRun, setDryRun] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [res, setRes] = useState<any>(null);
+  const [traces, setTraces] = useState<any[]>([]);
+  const [selectedTrace, setSelectedTrace] = useState<any>(null);
+
+  const loadTraces = async () => {
+    try { setTraces(await api(base, "/cognitive/traces?limit=25")); } catch {}
+  };
+  useEffect(() => { loadTraces(); /* eslint-disable-next-line */ }, [base]);
+
+  const submit = async () => {
+    if (!text.trim()) return;
+    setLoading(true); setRes(null); setSelectedTrace(null);
+    try {
+      const r = await api(base, "/cognitive/run", {
+        method: "POST",
+        body: JSON.stringify({ text, project: project || null, dry_run: dryRun }),
+      });
+      setRes(r); loadTraces();
+    } catch (e: any) { toast.error(e.message); }
+    finally { setLoading(false); }
+  };
+
+  const openTrace = async (id: string) => {
+    try { setSelectedTrace(await api(base, `/cognitive/traces/${id}`)); }
+    catch (e: any) { toast.error(e.message); }
+  };
+
+  const trace = selectedTrace || res?.trace;
+
+  return (
+    <div className="grid md:grid-cols-3 gap-4">
+      <div className="md:col-span-2 space-y-4">
+        <Card>
+          <CardHeader><CardTitle>Cognitive cycle</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <Textarea rows={3} placeholder="Talk to Rafael…" value={text} onChange={(e) => setText(e.target.value)} />
+            <div className="flex flex-wrap items-center gap-3">
+              <Input className="w-48" placeholder="project (optional)" value={project} onChange={(e) => setProject(e.target.value)} />
+              <div className="flex items-center gap-2">
+                <Switch id="cog-dry" checked={dryRun} onCheckedChange={setDryRun} />
+                <Label htmlFor="cog-dry">Dry run</Label>
+              </div>
+              <Button onClick={submit} disabled={loading}>{loading ? "Thinking…" : "Run cycle"}</Button>
+            </div>
+            {res && (
+              <div className="rounded-md border border-border p-4">
+                <div className="text-xs uppercase text-muted-foreground">Response · intent {res.trace.intent} · ok {String(res.ok)}</div>
+                <p className="whitespace-pre-wrap text-sm mt-1">{res.response}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {trace && (
+          <Card>
+            <CardHeader><CardTitle>Trace {trace.id?.slice(0, 8)}</CardTitle></CardHeader>
+            <CardContent className="space-y-2">
+              {(trace.entries || []).map((e: any, i: number) => (
+                <details key={i} className="rounded-md border border-border">
+                  <summary className="cursor-pointer px-3 py-2 text-sm flex items-center justify-between">
+                    <span className="font-mono">{e.stage}</span>
+                    <span className="text-xs text-muted-foreground">{e.duration_ms}ms</span>
+                  </summary>
+                  <pre className="text-xs px-3 pb-2 overflow-auto max-h-64">{JSON.stringify(e.payload, null, 2)}</pre>
+                </details>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Recent traces</CardTitle>
+          <Button size="sm" variant="outline" onClick={loadTraces}>Refresh</Button>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {traces.length === 0 && <p className="text-sm text-muted-foreground">No traces yet.</p>}
+          {traces.map((t: any) => (
+            <button
+              key={t.id}
+              onClick={() => openTrace(t.id)}
+              className="w-full text-left rounded-md border border-border p-2 hover:bg-accent/50 transition-colors"
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-xs">{t.id.slice(0, 8)}</span>
+                <Badge variant={t.ok ? "default" : "destructive"}>{t.intent}</Badge>
+              </div>
+              <div className="text-xs text-muted-foreground line-clamp-2 mt-1">{t.input}</div>
+            </button>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function LearningPanel({ base }: { base: string }) {
+  const [data, setData] = useState<any>(null);
+  const load = async () => {
+    try { setData(await api(base, "/learning")); } catch (e: any) { toast.error(e.message); }
+  };
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [base]);
+
+  return (
+    <div className="grid md:grid-cols-2 gap-4">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Skill performance</CardTitle>
+          <Button size="sm" variant="outline" onClick={load}>Refresh</Button>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {(!data || !data.skills?.length) && <p className="text-sm text-muted-foreground">No data yet.</p>}
+          {data?.skills?.map((s: any) => (
+            <div key={s.skill} className="rounded-md border border-border p-3 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="font-mono">{s.skill}</span>
+                <Badge variant={s.failures > 0 ? "destructive" : "default"}>
+                  {s.successes}/{s.runs}
+                </Badge>
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">
+                avg {Math.round(s.avg_ms)}ms{s.last_error ? ` · last: ${s.last_error}` : ""}
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+      <div className="space-y-4">
+        <Card>
+          <CardHeader><CardTitle>Intents</CardTitle></CardHeader>
+          <CardContent className="space-y-1">
+            {data?.intents?.map((r: any) => (
+              <div key={r.intent} className="flex justify-between text-sm">
+                <span className="font-mono">{r.intent}</span>
+                <span className="text-muted-foreground">{r.successes}/{r.runs}</span>
+              </div>
+            ))}
+            {!data?.intents?.length && <p className="text-sm text-muted-foreground">No data yet.</p>}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle>Recommendations</CardTitle></CardHeader>
+          <CardContent>
+            {data?.recommendations?.length ? (
+              <ul className="list-disc list-inside space-y-1 text-sm">
+                {data.recommendations.map((r: string, i: number) => <li key={i}>{r}</li>)}
+              </ul>
+            ) : <p className="text-sm text-muted-foreground">No recommendations yet.</p>}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
